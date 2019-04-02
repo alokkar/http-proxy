@@ -1,9 +1,11 @@
-import sys,socket
+import sys,socket,time
 from thread import *
 
-listen_port = 20101
-max_conn = 10
+listen_port = 20100
+max_conn = 50
 buffer_size = 8192
+
+cache = {}
 
 def start():
 	try:
@@ -61,7 +63,7 @@ def conn_string(conn,data,addr):
 
 
 def cache_check(url,conn,data):
-	TIMEOUT = 300
+	TIMEOUT = 600
 	global cache_check
 
 	orig_url = url
@@ -77,7 +79,7 @@ def cache_check(url,conn,data):
 
 	cache[orig_url]["calls"]+=1
 
-	if cache[orig_url][calls]<1:
+	if cache[orig_url]["calls"]<1:
 		return False
 
 	req = data.split('\r\n')
@@ -107,7 +109,7 @@ def cache_check(url,conn,data):
 
 
 	if cache[orig_url]["calls"]>1:
-		req.insert(2,"If-Modified-Since: {0}".format(time.strftime('%a, %d %b %Y %H:%M:%S GMT',time.gmttime(cache[orig_url]["time"]))))
+		req.insert(2,"If-Modified-Since: {0}".format(time.strftime('%a, %d %b %Y %H:%M:%S GMT',time.gmtime(cache[orig_url]["time"]))))
 
 	new_req = ""
 	for l in req:
@@ -161,7 +163,7 @@ def proxy_server(webserver,port,conn,addr,data,url):
 	try:
 		if cache_check(url,conn,data):
 			conn.close()
-			sys.exit
+			sys.exit()
 		s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 		s.connect((webserver,port))
 		s.send(data)
