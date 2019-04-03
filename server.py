@@ -12,6 +12,7 @@ def start():
 		s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 		s.bind(('',listen_port))
 		s.listen(max_conn)
+		print("Server Started listen port {0}".format(listen_port))
 	except Exception as e:
 		print(e)
 		print("Unable to start socket")
@@ -30,6 +31,7 @@ def start():
 
 def conn_string(conn,data,addr):
 	try:
+		print("Hello")
 		first_line = data.split('\n')[0]
 		url = first_line.split(' ')[1]
 		http_pos = url.find('://')
@@ -46,25 +48,32 @@ def conn_string(conn,data,addr):
 		if webserver_pos == -1:
 			webserver_pos = len(temp)
 
+		print(temp)
 		webserver=""
 		port = -1
 
 		if (port_pos==-1 or webserver_pos<port_pos):
 			port=80
 			webserver=temp[:webserver_pos]
+			print("webserver")
+			print(webserver)
 		else:
-			port=int((temp[(port_pos+1):])[webserver_pos-port_pos-1])
+			port=int((temp[(port_pos+1):])[:webserver_pos-port_pos-1])
 			webserver=temp[:port_pos]
+			print("webserver")
+			print(webserver)
+
+		print("New Connection to {0} {1}".format(webserver,port))
 
 		proxy_server(webserver,port,conn,addr,data,url)
 
-	except:
-		pass
-
+	except Exception as e:
+		print("Exception")
+		print(e)
 
 def cache_check(url,conn,data):
 	TIMEOUT = 600
-	global cache_check
+	global cache
 
 	orig_url = url
 	url_file=""
@@ -72,12 +81,20 @@ def cache_check(url,conn,data):
 		if url[i]!= "/":
 			url_file+=url[i]
 
+	print(url)
 	if url not in cache or time.time()-cache[orig_url]["time"]>=TIMEOUT:
+		print("URL not in cache")
 		entry = {"time":time.time(),"calls":1}
 		cache[orig_url]=entry
 		return False
 
-	cache[orig_url]["calls"]+=1
+	if url in cache:
+		if cache[orig_url]["calls"]==2:
+			cache[orig_url]["calls"]+=1
+		else:
+			cache[orig_url]["calls"]+=1
+			return False
+
 
 	if cache[orig_url]["calls"]<1:
 		return False
@@ -120,7 +137,10 @@ def cache_check(url,conn,data):
 	response=sock.recv(buffer_size)
 	change=False
 	if "304" in response.split("\r\n"):
+		print("change is true")
 		change=True
+	else:
+		print("Change is False")
 
 	temp = response.split("\r\n")
 	if not change:
@@ -133,11 +153,13 @@ def cache_check(url,conn,data):
 		temp[0]=temp2
 		response="\r\n".join(temp)
 		conn.send(response)
+	print(response)
 
-	if(cache[orig_url]["calls"]>1):
+	if(cache[orig_url]["calls"]>3):
 		if change:
-			cache[orig_url]["calls"]=1
+			cache[orig_url]["calls"]=3
 		else:
+			print("Reading url file")
 			with open(url_file,'r') as f:
 				while True:
 					data = f.read(buffer_size)
@@ -146,15 +168,16 @@ def cache_check(url,conn,data):
 						break
 
 
-	if cache[orig_url]["calls"] == 1:
+	if cache[orig_url]["calls"] == 3:
 		cache[orig_url]["time"] = time.time()
+		print("Writing url file")
 		with open(url_file,'wb') as f:
 			while True:
 				data = sock.recv(buffer_size)
-				f.write(data)
-				conn.send(data)
 				if not data:
 					break
+				f.write(data)
+				conn.send(data)
 
 	return True
 
